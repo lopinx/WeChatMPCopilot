@@ -1,0 +1,62 @@
+{
+    "gpts": [
+        {
+            "baseurl": "https://api.openai.com/v1",
+            "apikey": [
+                "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            ],
+            "models": [
+                "gpt-4o-mini"
+            ]
+        }
+    ],
+    "stopk":{
+        "cn": "ChineseStopWords.txt",
+        "en": "EnglishStopWords.txt"
+    },
+    "mps": [
+        {
+            "name": "吴罗平",
+            "appid": "",
+            "secret": "",
+            "baseurl": "https://api.weixin.qq.com",
+            "lang": "",
+            "keys": "keywords.txt",
+            "reqkeys": [
+                "SEO","网站建设","网络营销","网站优化","网站推广","网站流量","网站运营","微信公众号",
+                "Search Engine Optimization",
+                "Website Construction",
+                "Online Marketing",
+                "Website Optimization",
+                "Website Promotion",
+                "Website Operation",
+                "WeChat Public Account"
+            ],
+            "number": 3,
+            "source_url": "",
+            "author": "lopins",
+            "media_ids": {
+                "睡眠障碍（失眠）": "noV6uipu7YVLwbb16HbFYSJcwovsmrtAZjWhdKD_C1iCmv93lLTq6R7SdX3nOGN4",
+                "尿毒症": "noV6uipu7YVLwbb16HbFYYhQUy0at2Acn1ht3318BxHkwLmRrbuQuDu8Lzr59ERI",
+                "夫妻生活（两性）": "noV6uipu7YVLwbb16HbFYQVpJtBLVwJKybqkKFpo96Os5RohFpI5rCPeKELn_o1S",
+                "糖尿病（胰岛素）": "noV6uipu7YVLwbb16HbFYe9djnLaHk18OCw4cknHNsJ0VbRar092a4bIPwUc0f7w",
+                "美容抗衰 （国内）": "noV6uipu7YVLwbb16HbFYQzLytsMtfsdzQyCjZpNcVEs0WiB7Lo1v32QdzgbMnKc",
+                "关节炎（膝关节）": "noV6uipu7YVLwbb16HbFYey40BtXdboB-AMCY676hm03DHYL75xQZRgkoyUG05sZ",
+                "肝硬化": "noV6uipu7YVLwbb16HbFYT7zdck2-QW976rR7GOf8SrdtKgrmYYA9sQXoxoAdSvJ",
+                "肺（慢阻肺）": "noV6uipu7YVLwbb16HbFYWCcrIMhAqoJy5rI8E1cPfNLKxkipA_UKuJXuDcG00AF",
+                "干细胞VS免疫细胞": "noV6uipu7YVLwbb16HbFYWG-pc3sXRiIfHbob7hOL_AKHzEy5KTRYWxz1rXK9mT7",
+                "糖尿病": "noV6uipu7YVLwbb16HbFYaPeSVbgF2YVuNkmlANgjfNuEtg6kAk-O1Y4Si1UEAMx",
+                "癌症": "noV6uipu7YVLwbb16HbFYXKd9m8rHIRJDmZypQ7vtLIAz_hBgVKY8QRLRwHax9Wv",
+                "肺病": "noV6uipu7YVLwbb16HbFYcgFYLcRdkb3qhzX3QLVCrYdFNfvXDGFSiFLIbLRWNhH",
+                "干细胞": "noV6uipu7YVLwbb16HbFYXtLjpxmeESofvTgSA9NuT223w2qciBmsIV0rnue5XsF",
+                "好孕、怀孕、备孕": "noV6uipu7YVLwbb16HbFYelF4g4clOcXSvhh0_DD1Mku_-aDB7g0Ry7zGJtrisa3",
+                "医院": "noV6uipu7YVLwbb16HbFYSUwXbLJ_IaR3SMK1SrOEdD4LF5O9TEKV6SyE2U4EKcN"
+            },
+            "service_ad": "",
+            "contact_us": "",
+            "bottom_ad_top": "",
+            "bottom_ad_bottom": "",
+            "followme": ""
+        }
+    ]
+}
