@@ -13,7 +13,7 @@
     "stopk":{
         "cn": "ChineseStopWords.txt",
         "en": "EnglishStopWords.txt"
-    },
+    },  
     "mps": [
         {
             "name": "吴罗平",

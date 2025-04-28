@@ -32,7 +32,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 #  ##########################################################################################################################
 # 当前工作目录,配置文件
-WorkDIR = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path.cwd()
+WorkDIR = Path(__file__).resolve().parent
 config = json.load(open(WorkDIR/"config.json", 'r', encoding='utf-8'))
 # 下载分词库数据（首次运行需要）
 try:
@@ -429,7 +429,7 @@ class Extensions:
 7、文章写法指南：杜绝标题党（内容需与标题匹配），避免关键词堆砌（防止机械感），拒绝自嗨（测试三人法则：三人超3秒犹豫则重写）。
 8、请紧扣标题和关键词，切忌不要偏题、跑题。
 """
-        else:
+        elif mode == "title":
             prompts = f"""以<{keyword}>为关键词，请参考以下写法并结合行业特点写法拟一个{lang}爆款标题，请不要使用‘：’分隔标题，要尽量人性化和能勾起读者兴趣，你只需要把标题输出来，无需其他信息。
 以下是一些标题写法参考(按照这个句式，“：”前不是标题内容，而是要突出的核心思想)：
 - 第一招：数字法进阶版
@@ -472,7 +472,11 @@ class Extensions:
 具体场景：蹲马桶刷手机时，顺手就能做的5个搞钱副业
 对话还原：领导说'辛苦了'千万别回'应该的'
 锁定周五下班前、改第五版方案、微信第3条消息等细节
-"""
+""" 
+        elif mode == "excerpt":
+            prompts = f"""请根据我提供的文章内容对文章做一个100字左右{lang}简单概述，并以纯文本返回给我，只要输出概述内容，无需原文和其他，以下是文章内容：\n{keyword}"""
+        else:
+            prompts = f"""请根据我提供的文章内容提取出5个合适的关键词，以英文半角逗号分隔，并以纯文本返回给我，只要输出关键词内容，无需原文和其他，以下是文章内容：\n{keyword}"""
         client = OpenAI(
             api_key=random.choice(gpt["apikey"]), 
             base_url=gpt["baseurl"],
@@ -595,16 +599,27 @@ class Extensions:
                         toc_anchor_title_class='toc-anchor-title'
                     )
             # 提取文章SEO关键词
-            # 分词库：必要词
-            if '.txt' not in platform.get('reqkeys'):
-                reqkeys = list(set(platform.get('reqkeys')))
-            elif (reqkeys_path := WorkDIR / platform.get('reqkeys')).exists():
-                with reqkeys_path.open('r', encoding='utf-8') as req_key:
-                    reqkeys = list(set([s for l in req_key if (s := re.sub(r'[\n\ufeff]', '', l)) and len(s) > 1]))
-            else:
-                reqkeys = keys if mode == 'keywords' else []
-            _tags = Extensions.extract_keywords(_content, reqkeys)[:5]
-            logging.info(f'关键词：{_tags}')
+            # # 分词库：必要词
+            # if '.txt' not in platform.get('reqkeys'):
+            #     reqkeys = list(set(platform.get('reqkeys')))
+            # elif (reqkeys_path := WorkDIR / platform.get('reqkeys')).exists():
+            #     with reqkeys_path.open('r', encoding='utf-8') as req_key:
+            #         reqkeys = list(set([s for l in req_key if (s := re.sub(r'[\n\ufeff]', '', l)) and len(s) > 1]))
+            # else:
+            #     reqkeys = keys if mode == 'keywords' else []
+            # _tags = Extensions.extract_keywords(_content, reqkeys)[:5]
+            # # logging.info(f'关键词：{_tags}')
+            _ts = Extensions.get_gpt_generation(keyword=_content, lang=platform.get('lang'), mode="keywords")
+            _tags = [x.strip() for x in re.split(r'[,\u3001]+', _ts) if x.strip()]
+
+            _excerpt = Extensions.get_gpt_generation(keyword=_content, lang=platform.get('lang'), mode="excerpt")
+
+            logging.info(f"摘要：{_excerpt}\n\n\n描述：{_tags}\n\n\n")
+
+            # if _excerpt and len(_excerpt) > 100:
+            #     article['excerpt'] = _excerpt
+            # else:
+            #     article['excerpt'] = _content
 
             # 文章再处理（符合平台需要）有BUG
             # _content  = f"""
@@ -619,9 +634,9 @@ class Extensions:
             article = {
                 "title": _title,                        # 文章标题
                 "keyword": key,                         # 原始关键词
-                "content": _content
-                # "tags": _tags if _tags else [keyword],
-                # "excerpt": ""
+                "content": _content,
+                "tags": _tags if _tags else [key],
+                "excerpt": ""
             }
             # 判断文章是否为空
             if not any(v == "" or v is None or (hasattr(v, '__len__') and len(v) == 0) for v in article.values()):
