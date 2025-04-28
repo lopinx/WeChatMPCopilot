@@ -1,38 +1,31 @@
 {
     "gpts": [
         {
-            "baseurl": "https://api.openai.com/v1",
+            "baseurl": "http://127.0.0.1/v1",
             "apikey": [
-                "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                "EMPTY"
             ],
             "models": [
-                "gpt-4o-mini"
-            ]
+                "deepseek-r1:latest"
+            ],
+            "fee_type": "free",
+            "from_type": "text",
+            "to_type": "text",
+            "min_tokens": 512000
         }
     ],
     "stopk":{
         "cn": "ChineseStopWords.txt",
         "en": "EnglishStopWords.txt"
-    },  
+    },
     "mps": [
         {
             "name": "吴罗平",
             "appid": "",
             "secret": "",
-            "baseurl": "https://api.weixin.qq.com",
-            "lang": "",
+            "wechatapi": "https://api.weixin.qq.com",
             "keys": "keywords.txt",
-            "reqkeys": [
-                "SEO","网站建设","网络营销","网站优化","网站推广","网站流量","网站运营","微信公众号",
-                "Search Engine Optimization",
-                "Website Construction",
-                "Online Marketing",
-                "Website Optimization",
-                "Website Promotion",
-                "Website Operation",
-                "WeChat Public Account"
-            ],
-            "number": 3,
+            "number": 20,
             "source_url": "",
             "author": "lopins",
             "media_ids": {
