@@ -20,5 +20,6 @@ dependencies = [
     "pygments>=2.19.1",
     "pymdown-extensions>=10.14.3",
     "python-levenshtein>=0.27.1",
+    "rank-bm25>=0.2.2",
     "scikit-learn>=1.6.1",
 ]

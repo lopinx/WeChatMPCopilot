@@ -2,7 +2,7 @@
 __author__ = "https://github.com/lopinx"
 # 导出包： uv pip freeze | uv pip compile - -o requirements.txt
 # =========================================================================================================================
-# pip install httpx[http2,http3] keybert scikit-learn jieba nltk fuzzywuzzy python-Levenshtein markdown pygments pymdown-extensions markdownify openai pandas
+# pip install httpx[http2,http3] keybert scikit-learn jieba nltk rank-bm25 fuzzywuzzy python-Levenshtein markdown pygments pymdown-extensions markdownify openai pandas
 # ==========================================================================================================================
 import json
 import logging
@@ -10,25 +10,25 @@ import random
 import re
 import time
 import uuid
-import sys
-# from collections import Counter, OrderedDict
+from collections import defaultdict, Counter, OrderedDict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import httpx
 import jieba
 import jieba.analyse
-import jieba.posseg as pseg
 import markdown  # markdown转html
 import nltk
+import numpy as np
 from fuzzywuzzy import process
 from keybert import KeyBERT
 from markdownify import markdownify  # html转markdown
 from nltk.corpus import stopwords
-# from nltk.tokenize import word_tokenize
+from nltk.tokenize import sent_tokenize, word_tokenize
 # from nltk.util import everygrams
 from openai import OpenAI
 from sklearn.feature_extraction.text import TfidfVectorizer
+from rank_bm25 import BM25Okapi
 
 #  ##########################################################################################################################
 # 当前工作目录,配置文件
@@ -219,9 +219,7 @@ class WeChatMP():
 
 
 # ========================================================================================================================
-
-# 以下文拓展类
-
+# 以下为拓展类，按需使用
 # ========================================================================================================================
 
     """发布到文章到公众号上"""
@@ -230,15 +228,15 @@ class WeChatMP():
         articles = Extensions.get_article_data(self.wechat)
         if not articles:
             return False
-        # # 2 保存微信草稿
-        # draft_status, draft_id = self.get_wechatmp_draft(articles)
-        # if not draft_status: 
-        #     return False
-        # # 3 微信推送发布    
-        # publish_status, publish_id = self.get_wechatmp_publish(draft_id)
-        # if not publish_status: 
-        #     return "发布失败", None
-        # return "发布成功", publish_id
+        if self.wechat['draft']:# 2 保存微信草稿
+            draft_status, draft_id = self.get_wechatmp_draft(articles)
+            if not draft_status: 
+                return False
+        if self.wechat['publish']:# 3 微信推送发布
+            publish_status, publish_id = self.get_wechatmp_publish(draft_id)
+            if not publish_status: 
+                return "发布失败", None
+        return "发布成功", publish_id
 
 
 class Extensions:
@@ -369,7 +367,7 @@ class Extensions:
             scores = {
                 word: score * tfidf[0, vocab.get(word, -1)]
                 for word, score in keywords
-                if word in vocab
+                if word in vocab and word.lower() in content.lower()  # 确保关键词在文章中
             }
         else:
             # 中文处理：TextRank + 词密度
@@ -385,18 +383,18 @@ class Extensions:
             scores = {
                 word: text_rank.get(word, 0) * tfidf[vocab[word]] 
                 for word in keywords 
-                if word in vocab
+                 if word in vocab and word in content  # 确保关键词在文章中
             }
         # 强制合并用户词典中的词（中英文统一处理）
         for key in require_words:
             word = key.lower()
-            if word in vocab and word not in scores:
+            if word in content.lower() and word not in scores:  # 确保用户词在文章中
                 scores[word] = tfidf[vocab[word]] if cn_lang else 1.0 * tfidf[0, vocab[word]]
         # 强制包含用户提供词（统一逻辑）
-        max_score = max(scores.values(), default=0)
         for req_word in (r.lower() for r in require_words):
-            current = scores.get(req_word, 0)
-            scores[req_word] = current * 2 if current else max_score * 2 + 1
+            if req_word in content.lower():  # 确保用户词在文章中
+                current = scores.get(req_word, 0)
+                scores[req_word] = current * 2 if current else max(scores.values(), default=0) * 2 + 1
 
         # 生成排序后的关键词列表
         t_k = sorted(scores.keys(), key=lambda k: (-scores[k], -len(k)))
@@ -406,11 +404,48 @@ class Extensions:
         # ===============================================================================================================
 
 
+    @staticmethod
+    def extract_excerpt(content: str, length: int = 3) -> str:
+        # 先将markdown格式转换为纯文本格式
+        sentences = sent_tokenize(markdownify(content))
+        # 判断文本语言（中文/英文）
+        cn_lang = any(
+            (u'\u4e00' <= char <= u'\u9fa5') or
+            (u'\u3400' <= char <= u'\u4DBF') or
+            (u'\U00020000' <= char <= u'\U0002A6DF')
+            for char in content
+        )
+        # 分句处理
+        if not cn_lang:
+            sentences = sent_tokenize(content)
+            stop_words = set(stopwords.words('english')).union(en_stopk)
+        else:
+            sentences = [s.strip() for s in re.split(r'[。！？\.\!\?]\s*', content) if s.strip()]
+            stop_words = set(stopwords.words('chinese')).union(cn_stopk)
+        # 分词并去除停用词
+        _sents = []
+        for sent in sentences:
+            if not cn_lang:
+                tokens = [word for word in word_tokenize(sent.lower()) if word not in stop_words]
+            else:
+                tokens = [word for word in jieba.cut(sent) if word not in stop_words]
+            _sents.append(tokens)
+        # 计算 BM25
+        bm25 = BM25Okapi(_sents)
+        # 计算每个句子的得分
+        scores = []
+        for query in _sents:
+            scores.append(bm25.get_scores(query).mean())  # 使用平均得分
+        # 获取得分最高的句子索引并返回摘要
+        excerpt = ' '.join([sentences[i] for i in sorted(np.argsort(scores)[::-1][:length])])
+        return excerpt
+
+
     """通过AI生成标题或内容"""
     @staticmethod
     def get_gpt_generation(keyword: str, lang: str = "",mode: str = "body") -> Optional[str]:
         gpt = random.choice(gpts)
-        role = "你是一个聪明且富有创造力的专业文案编辑。"
+        role = f"你是一个精通相关领域内知识和技能的{lang}资深文案编辑。"
         if mode == "body":
             prompts = f"""以<{keyword}>为标题，写一篇{lang}爆款科普性文章，以Markdown格式源码返回,只要输出文章内容，不要输出标题。
 采用文案创作黄金三秒原则。
@@ -474,9 +509,11 @@ class Extensions:
 锁定周五下班前、改第五版方案、微信第3条消息等细节
 """ 
         elif mode == "excerpt":
-            prompts = f"""请根据我提供的文章内容对文章做一个100字左右{lang}简单概述，并以纯文本返回给我，只要输出概述内容，无需原文和其他，以下是文章内容：\n{keyword}"""
+            prompts = f"""请根据我提供的文章内容并结合搜索引擎规则对文章做一个100字左右{lang}简单概述，并以纯文本返回给我，只要输出概述内容，无需原文和其他，以下是文章内容：\n{keyword}"""
+        elif mode == "tags":
+            prompts = f"""请根据我提供的文章内容并结合搜索引擎规则提取出5个合适的关键词，以逗号分隔，并以纯文本返回给我，只要输出关键词内容，无需原文和其他，以下是文章内容：\n{keyword}"""
         else:
-            prompts = f"""请根据我提供的文章内容提取出5个合适的关键词，以英文半角逗号分隔，并以纯文本返回给我，只要输出关键词内容，无需原文和其他，以下是文章内容：\n{keyword}"""
+            prompts = ''
         client = OpenAI(
             api_key=random.choice(gpt["apikey"]), 
             base_url=gpt["baseurl"],
@@ -506,7 +543,7 @@ class Extensions:
         except Exception as e:
             logging.error(f"{str(e)}")
             return None
-
+        
 
     """整合成发布的数据结构"""
     @staticmethod
@@ -571,6 +608,25 @@ class Extensions:
                     logging.error(f"文章详情 【内容】 不符合要求")
                     continue
             
+            # 提取文章SEO关键词
+            # 分词库：必要词
+            if not platform.get('aitags'):
+                if '.txt' not in platform.get('reqkeys'):
+                    reqkeys = list(set(platform.get('reqkeys')))
+                elif (reqkeys_path := WorkDIR / platform.get('reqkeys')).exists():
+                    with reqkeys_path.open('r', encoding='utf-8') as req_key:
+                        reqkeys = list(set([s for l in req_key if (s := re.sub(r'[\n\ufeff]', '', l)) and len(s) > 1]))
+                else:
+                    reqkeys = keys if mode == 'keywords' else []
+                _tags = Extensions.extract_keywords(_content, reqkeys)[:5]
+            else:
+                _ts = Extensions.get_gpt_generation(keyword=_content, lang=platform.get('lang'), mode="tags")
+                _tags = [x.strip() for x in re.split(r'[,\u3001]+', _ts) if x.strip()]
+            if not platform.get('aiexcerpt'):
+                _excerpt = Extensions.extract_excerpt(content=_content, length=5)
+            else:
+                _excerpt = Extensions.get_gpt_generation(keyword=_content, lang=platform.get('lang'), mode="excerpt")
+
             # 去掉机械式开头
             desc_preg = r'^.*?【?(?:本文|文章|本篇|全文|前言)\s*[，,]?\s*(?:简介|摘要|概述|导读|描述)】?[：:]?'
             # 检测Markdown的常见语法，如果不是则进行转换
@@ -598,28 +654,6 @@ class Extensions:
                         toc_anchor_title=u'跳转至文章目录',
                         toc_anchor_title_class='toc-anchor-title'
                     )
-            # 提取文章SEO关键词
-            # # 分词库：必要词
-            # if '.txt' not in platform.get('reqkeys'):
-            #     reqkeys = list(set(platform.get('reqkeys')))
-            # elif (reqkeys_path := WorkDIR / platform.get('reqkeys')).exists():
-            #     with reqkeys_path.open('r', encoding='utf-8') as req_key:
-            #         reqkeys = list(set([s for l in req_key if (s := re.sub(r'[\n\ufeff]', '', l)) and len(s) > 1]))
-            # else:
-            #     reqkeys = keys if mode == 'keywords' else []
-            # _tags = Extensions.extract_keywords(_content, reqkeys)[:5]
-            # # logging.info(f'关键词：{_tags}')
-            _ts = Extensions.get_gpt_generation(keyword=_content, lang=platform.get('lang'), mode="keywords")
-            _tags = [x.strip() for x in re.split(r'[,\u3001]+', _ts) if x.strip()]
-
-            _excerpt = Extensions.get_gpt_generation(keyword=_content, lang=platform.get('lang'), mode="excerpt")
-
-            logging.info(f"摘要：{_excerpt}\n\n\n描述：{_tags}\n\n\n")
-
-            # if _excerpt and len(_excerpt) > 100:
-            #     article['excerpt'] = _excerpt
-            # else:
-            #     article['excerpt'] = _content
 
             # 文章再处理（符合平台需要）有BUG
             # _content  = f"""
@@ -636,7 +670,7 @@ class Extensions:
                 "keyword": key,                         # 原始关键词
                 "content": _content,
                 "tags": _tags if _tags else [key],
-                "excerpt": ""
+                "excerpt": _excerpt
             }
             # 判断文章是否为空
             if not any(v == "" or v is None or (hasattr(v, '__len__') and len(v) == 0) for v in article.values()):

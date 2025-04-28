@@ -83,6 +83,7 @@ nltk==3.9.1
 numpy==2.2.5
     # via
     #   keybert
+    #   rank-bm25
     #   scikit-learn
     #   scipy
     #   transformers
@@ -106,6 +107,7 @@ pyyaml==6.0.2
     #   huggingface-hub
     #   pymdown-extensions
     #   transformers
+rank-bm25==0.2.2
 rapidfuzz==3.13.0
     # via levenshtein
 regex==2024.11.6
