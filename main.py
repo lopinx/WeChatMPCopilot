@@ -10,7 +10,7 @@ import random
 import re
 import time
 import uuid
-from collections import defaultdict, Counter, OrderedDict
+from collections import Counter, OrderedDict, defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -27,8 +27,8 @@ from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize, word_tokenize
 # from nltk.util import everygrams
 from openai import OpenAI
-from sklearn.feature_extraction.text import TfidfVectorizer
 from rank_bm25 import BM25Okapi
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 #  ##########################################################################################################################
 # 当前工作目录,配置文件
