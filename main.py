@@ -3,6 +3,9 @@ __author__ = "https://github.com/lopinx"
 # 导出包： uv pip freeze | uv pip compile - -o requirements.txt
 # =========================================================================================================================
 # pip install httpx[http2,http3] keybert scikit-learn jieba nltk rank-bm25 fuzzywuzzy python-Levenshtein markdown pygments pymdown-extensions markdownify openai pandas
+# 朱雀大模型检测：https://matrix.tencent.com/ai-detect/
+# 朱雀大模型续杯：`localStorage.setItem('fp',Array.from({ length: 32 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''))`
+#
 # ==========================================================================================================================
 import json
 import logging
@@ -235,8 +238,11 @@ class WeChatMP():
         if self.wechat['publish']:# 3 微信推送发布
             publish_status, publish_id = self.get_wechatmp_publish(draft_id)
             if not publish_status: 
-                return "发布失败", None
-        return "发布成功", publish_id
+                return False
+            elif len(publish_id) > 16:
+                return "发布成功", publish_id
+            else: 
+                return "发布失败", publish_id
 
 
 class Extensions:
@@ -445,27 +451,25 @@ class Extensions:
     @staticmethod
     def get_gpt_generation(keyword: str, lang: str = "",mode: str = "body") -> Optional[str]:
         gpt = random.choice(gpts)
-        role = f"你是一个精通相关领域内知识和技能的{lang}资深文案编辑。"
+        role = f"你是一个具有丰富行业知识{'，深谙中国《广告法》' if lang !='英文' else ''}的资深{lang}文案编辑，"
         if mode == "body":
-            prompts = f"""以<{keyword}>为标题，写一篇{lang}爆款科普性文章，以Markdown格式源码返回,只要输出文章内容，不要输出标题。
+            prompts = f"""以<{keyword}>为标题，写一篇{lang}爆款科普性文章，以Markdown格式输出,只需输出文章内容，不要输出标题。
 采用文案创作黄金三秒原则。
-要求站在用户角度思考和解读，直击用户痛点，共情用户情绪，并且引导用户关注和咨询。
-文章中需要安排放置插图的地方请以 “[文章插图]” 提示（单独一行），我会在后续处理。
-文内二维码图片我会使用其他生成，请不要再在文章中提示放置。
+要求站在用户角度思考和解读，直击用户痛点，共情用户情绪，并且引导用户咨询和持续关注。
 排版需要考虑阅读体验，合理安排重点信息词语或者段落高亮，每行都需要间隔一个空行（代码除外）。
+在不破坏阅读体验的情况下文章中需要合理安排插入 “[文章插图]”、"[二维码]"。
 不要出现与内容无关的解释性语句和文章提示。
 此外，新写的文章需要具备以下特点：
-1、结构清晰明了，内容之间过渡自然，读者可以轻松理解文章的思路。
-2、包含充足的信息和证据，能够支撑文内观点和论据，同时具有独特的见解和观点。
-3、使用简练、准确、明确的语言，语法正确，拼写无误，让读者可以轻松理解文章意图。
-4、风格适当，包括用词、语气、句式和结构，适应读者的背景和阅读目的。
-5、避免过于学术化的表达，避免机械化的表达，避免使用过时的技术、方法、术语等。
-6、引入BERT语义拓扑建模、TF-IDF向量分析、三元组知识图谱和LDA主题模型等高级技术进一步提升SEO效果。
-7、文章写法指南：杜绝标题党（内容需与标题匹配），避免关键词堆砌（防止机械感），拒绝自嗨（测试三人法则：三人超3秒犹豫则重写）。
-8、请紧扣标题和关键词，切忌不要偏题、跑题。
+1. 文章结构清晰，段落过渡自然，避开冷僻词汇，删减文章末尾总结/结论/展望部分，让内容简洁流畅，便于轻松把握思路与意图。
+2. 替换或减少机械式连接词（如：首先、其次、然后、再次、最后、总之、总而言之、然而、因此、另外、此外），改用更基础、常用、甚至口语化的表达，以增加自然度和可读性。
+3. 内容充实，论据充分，支撑观点的同时展现独特视角；辅以案例与数据，提升可信度与说服力（谷歌算法EEAT原则）。
+4. 风格适配，语言要素（用词/语气/句式/结构）贴合读者需求；融入个人视角与情感，增强文章个性与温度。
+5. 融合BERT语义建模、TF-IDF向量分析、BM25相关性排序、三元组知识图谱与LDA主题模型，全面提升SEO的语义理解、关键词优化及内容关联性。
+6. 规避《广告法》禁用词：禁用“最”“唯一”等绝对词；效果描述加“可能”“部分用户反馈”等限定词；医疗/食品类禁用“治疗”“治愈”，改用“辅助”“护理”；数据标注来源（如“内部调研显示…”）。
+7. 写法指南：杜绝标题党（内容需与标题匹配），避免关键词堆砌（防止机械感），拒绝自嗨（测试三人法则：三人超3秒犹豫则重写）。聚焦标题和关键词，切忌不要偏题、跑题。
 """
         elif mode == "title":
-            prompts = f"""以<{keyword}>为关键词，请参考以下写法并结合行业特点写法拟一个{lang}爆款标题，请不要使用‘：’分隔标题，要尽量人性化和能勾起读者兴趣，你只需要把标题输出来，无需其他信息。
+            prompts = f"""以<{keyword}>为关键词，请参考以下写法并结合行业特点写法拟一个{lang}爆款标题，杜绝使用‘：’分割标题，要尽量人性化和能勾起读者兴趣，并以纯文本输出概述内容，无需其他信息。
 以下是一些标题写法参考(按照这个句式，“：”前不是标题内容，而是要突出的核心思想)：
 - 第一招：数字法进阶版
 用具体天数制造真实感：月薪5千到5万，我用了237天
@@ -509,9 +513,9 @@ class Extensions:
 锁定周五下班前、改第五版方案、微信第3条消息等细节
 """ 
         elif mode == "excerpt":
-            prompts = f"""请根据我提供的文章内容并结合搜索引擎规则对文章做一个100字左右{lang}简单概述，并以纯文本返回给我，只要输出概述内容，无需原文和其他，以下是文章内容：\n{keyword}"""
+            prompts = f"""请根据我提供的文章内容并结合搜索引擎规则对文章做一个100字左右{lang}简单概述，以纯文本输出概述内容，无需原文和其他，以下是文章内容：\n{keyword}"""
         elif mode == "tags":
-            prompts = f"""请根据我提供的文章内容并结合搜索引擎规则提取出5个合适的关键词，以逗号分隔，并以纯文本返回给我，只要输出关键词内容，无需原文和其他，以下是文章内容：\n{keyword}"""
+            prompts = f"""请根据我提供的文章内容并结合搜索引擎规则提取出5个合适的关键词，用逗号分隔，以纯文本输出关键词内容，无需原文和其他，以下是文章内容：\n{keyword}"""
         else:
             prompts = ''
         client = OpenAI(
@@ -534,11 +538,6 @@ class Extensions:
                 presence_penalty=0.5    # 鼓励模型引入新内容
             )
             content = completion.choices[0].message.content
-            # try:
-            #     reasoning_content = completion.choices[0].message.reasoning_content
-            # except:
-            #     reasoning_content = ''
-            # 去掉思维链
             return re.sub(r'<think>.*</think>', '', content, flags=re.DOTALL)
         except Exception as e:
             logging.error(f"{str(e)}")
@@ -628,7 +627,7 @@ class Extensions:
                 _excerpt = Extensions.get_gpt_generation(keyword=_content, lang=platform.get('lang'), mode="excerpt")
 
             # 去掉机械式开头
-            desc_preg = r'^.*?【?(?:本文|文章|本篇|全文|前言)\s*[，,]?\s*(?:简介|摘要|概述|导读|描述)】?[：:]?'
+            desc_preg = r'^.*?【?(?:本文|文章|本篇|全文|前言)\s*[，,]?\s*(?:简介|摘要|概述|导读|描述|引言)】?[：:]?'
             # 检测Markdown的常见语法，如果不是则进行转换
             if re.search(r'#{1,6} |^-.*$|^```|^\|', _content, re.MULTILINE):
                 _html = markdown.markdown(_content)

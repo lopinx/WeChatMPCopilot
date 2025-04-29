@@ -78,41 +78,75 @@ pip install httpx[http2,http3] keybert scikit-learn jieba nltk fuzzywuzzy python
 
 `config.json` 文件包含项目的全局配置信息，包括微信公众号 API 的凭据、GPT 模型的配置以及文章生成的相关参数。以下是一个示例配置：
 
-```json
+``` json5
 {
     "gpts": [
-        {
-            "baseurl": "https://openrouter.ai/api/v1",
-            "apikey": ["your-api-key"],
-            "models": [],
-            "fee_type": "free",
-            "from_type": "text",
-            "to_type": "text",
-            "min_tokens": 4096
-        }
-    ],
-    "mps": [
-        {
-            "appid": "your-appid",
-            "secret": "your-secret",
-            "baseurl": "https://api.weixin.qq.com",
-            "media_ids": {
-                "科技": "media-id-1",
-                "生活": "media-id-2"
-            },
-            "source_url": "https://example.com/source",
-            "author": "Your Name",
-            "keys": "keywords.txt",
-            "reqkeys": "required_keywords.txt",
-            "number": 5,
-            "lang": "zh"
-        }
+      {
+        "baseurl": "http://127.0.0.1:11434/v1", //API接口地址，/chat/completions 前部分
+        "apikey": [
+          "EMPTY"
+        ],
+        "models": [
+          "deepseek-r1:latest"                  // GPT模型,列表引入，可以多个
+        ]
+      }
     ],
     "stopk": {
-        "cn": "ChineseStopWords.txt",
-        "en": "EnglishStopWords.txt"
-    }
-}
+      "cn": "ChineseStopWords.txt",             // 停用词文件路径
+      "en": "EnglishStopWords.txt"              // 停用词文件路径
+    },
+    "mps": [
+      {
+        "name": "吴罗平",                       // 公众号名称
+        "appid": "",                            // 公众号 AppID
+        "secret": "",                           // 公众号 AppSecret
+        "baseurl": "https://api.weixin.qq.com", // 微信公众号 API 接口地址
+        "lang": "中文",                          // 文章语言类型
+        "aitags": true,                         // 是否使用GPT生成标签
+        "aiexcerpt": true,                      // 是否使用GPT生成摘要
+        "draft": false,                         // 是否上传草稿
+        "publish": false,                       // 是否发布文章
+        "keys": "keywords.txt",                  // 关键词文件路径
+        // reqkeys: 核心关键词列表（影响分词结果，不是必须）
+        "reqkeys": [
+          "SEO",
+          "网站建设",
+          "网络营销",
+          "网站优化",
+          "网站推广",
+          "网站流量",
+          "网站运营",
+          "微信公众号"
+        ],
+        "number": 3,                            // 每次最多生成文章数量
+        "source_url": "",                         // 阅读原文 链接
+        "author": "lopins",                      // 文章作者
+        // 图片素材，从微信公众号素材库上传的图片素材ID（需要自己获取，本项目不提供：因为不是所有人都需要，关键词：素材ID）
+        "media_ids": {
+          "睡眠障碍（失眠）": "noV6uipu7YVLwbb16HbFYSJcwovsmrtAZjWhdKD_C1iCmv93lLTq6R7SdX3nOGN4",
+          "尿毒症": "noV6uipu7YVLwbb16HbFYYhQUy0at2Acn1ht3318BxHkwLmRrbuQuDu8Lzr59ERI",
+          "夫妻生活（两性）": "noV6uipu7YVLwbb16HbFYQVpJtBLVwJKybqkKFpo96Os5RohFpI5rCPeKELn_o1S",
+          "糖尿病（胰岛素）": "noV6uipu7YVLwbb16HbFYe9djnLaHk18OCw4cknHNsJ0VbRar092a4bIPwUc0f7w",
+          "美容抗衰 （国内）": "noV6uipu7YVLwbb16HbFYQzLytsMtfsdzQyCjZpNcVEs0WiB7Lo1v32QdzgbMnKc",
+          "关节炎（膝关节）": "noV6uipu7YVLwbb16HbFYey40BtXdboB-AMCY676hm03DHYL75xQZRgkoyUG05sZ",
+          "肝硬化": "noV6uipu7YVLwbb16HbFYT7zdck2-QW976rR7GOf8SrdtKgrmYYA9sQXoxoAdSvJ",
+          "肺（慢阻肺）": "noV6uipu7YVLwbb16HbFYWCcrIMhAqoJy5rI8E1cPfNLKxkipA_UKuJXuDcG00AF",
+          "干细胞VS免疫细胞": "noV6uipu7YVLwbb16HbFYWG-pc3sXRiIfHbob7hOL_AKHzEy5KTRYWxz1rXK9mT7",
+          "糖尿病": "noV6uipu7YVLwbb16HbFYaPeSVbgF2YVuNkmlANgjfNuEtg6kAk-O1Y4Si1UEAMx",
+          "癌症": "noV6uipu7YVLwbb16HbFYXKd9m8rHIRJDmZypQ7vtLIAz_hBgVKY8QRLRwHax9Wv",
+          "肺病": "noV6uipu7YVLwbb16HbFYcgFYLcRdkb3qhzX3QLVCrYdFNfvXDGFSiFLIbLRWNhH",
+          "干细胞": "noV6uipu7YVLwbb16HbFYXtLjpxmeESofvTgSA9NuT223w2qciBmsIV0rnue5XsF",
+          "好孕、怀孕、备孕": "noV6uipu7YVLwbb16HbFYelF4g4clOcXSvhh0_DD1Mku_-aDB7g0Ry7zGJtrisa3",
+          "医院": "noV6uipu7YVLwbb16HbFYSUwXbLJ_IaR3SMK1SrOEdD4LF5O9TEKV6SyE2U4EKcN"
+        },
+        "service_ad": "",                        // 服务广告（HTML源码：注意转义防止json识别报错）
+        "contact_us": "",                        // 联系我们（HTML源码：注意转义防止json识别报错）
+        "bottom_ad_top": "",                     // 底部广告（HTML源码：注意转义防止json识别报错）
+        "bottom_ad_bottom": "",                  // 底部广告（HTML源码：注意转义防止json识别报错）
+        "followme": ""                           // 公众号关注Banner（HTML源码：从公众号编辑器F12方式获取，注意转义防止json识别报错）
+      }
+    ]
+  }
 ```
 
 #### 配置字段说明
@@ -230,9 +264,11 @@ A: 编辑 `config.json` 文件，在 `gpts` 字段中添加新的模型配置。
 }
 ```
 
+**后四个参数为非必填项，可自行添加。**
+
 ### Q: 如何处理图片？
 
-A: 脚本会自动上传图片并返回媒体 ID。确保图片路径正确，并在 `config.json` 中配置媒体 ID 映射。
+A: 脚本会自动上传图片并返回媒体 ID。确保图片路径正确，或者在 `config.json` 中配置媒体 ID 映射（从微信公众平台通过API获取）。
 
 ### Q: 如何调整文章生成逻辑？
 
