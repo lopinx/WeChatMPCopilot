@@ -20,22 +20,14 @@
         "appid": "",
         "secret": "",
         "baseurl": "https://api.weixin.qq.com",
+        "cms": "hugo",
         "lang": "中文",
         "aitags": true,
         "aiexcerpt": true,
         "draft": false,
         "publish": false,
         "keys": "keywords.txt",
-        "reqkeys": [
-          "SEO",
-          "网站建设",
-          "网络营销",
-          "网站优化",
-          "网站推广",
-          "网站流量",
-          "网站运营",
-          "微信公众号"
-        ],
+        "reqkeys": [],
         "number": 3,
         "source_url": "",
         "author": "lopins",
@@ -60,7 +52,9 @@
         "contact_us": "",
         "bottom_ad_top": "",
         "bottom_ad_bottom": "",
-        "followme": ""
+        "followme": "",
+        "phtag": "<p style=\"box-sizing: border-box; border-width: 0px; border-style: solid; border-color: hsl(var(--border)); margin: 1.5em 8px; text-align: left; line-height: 1.75; font-family: -apple-system-font, BlinkMacSystemFont, \"Helvetica Neue\", \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei UI\", \"Microsoft YaHei\", Arial, sans-serif; font-size: 14px; letter-spacing: 0.1em; color: rgb(63, 63, 63); visibility: visible;\">",
+        "hrtag": "<hr style=\"box-sizing: border-box; border-width: 2px 0px 0px; border-style: solid; border-color: rgba(0, 0, 0, 0.1); height: 0.4em; color: inherit; margin: 1.5em 0px; text-align: left; line-height: 1.75; font-family: -apple-system-font, BlinkMacSystemFont, \"Helvetica Neue\", \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei UI\", \"Microsoft YaHei\", Arial, sans-serif; font-size: 14px; transform-origin: 0px 0px; transform: scale(1, 0.5); visibility: visible;\">\n<h3>"
       }
     ]
   }

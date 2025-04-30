@@ -19,7 +19,10 @@ dependencies = [
     "openai>=1.75.0",
     "pygments>=2.19.1",
     "pymdown-extensions>=10.14.3",
+    "pypinyin>=0.54.0",
     "python-levenshtein>=0.27.1",
+    "python-slugify>=8.0.4",
     "rank-bm25>=0.2.2",
     "scikit-learn>=1.6.1",
+    "tomlkit>=0.13.2",
 ]

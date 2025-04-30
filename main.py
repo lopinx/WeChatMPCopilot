@@ -2,7 +2,7 @@
 __author__ = "https://github.com/lopinx"
 # 导出包： uv pip freeze | uv pip compile - -o requirements.txt
 # =========================================================================================================================
-# pip install httpx[http2,http3] keybert scikit-learn jieba nltk rank-bm25 fuzzywuzzy python-Levenshtein markdown pygments pymdown-extensions markdownify openai pandas
+# pip install httpx[http2,http3] keybert scikit-learn jieba nltk rank-bm25 fuzzywuzzy python-Levenshtein markdown pygments pymdown-extensions markdownify openai pandas python-slugify pypinyin tomlkit
 # 朱雀大模型检测：https://matrix.tencent.com/ai-detect/
 # 朱雀大模型续杯：`localStorage.setItem('fp',Array.from({ length: 32 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''))`
 #
@@ -23,6 +23,7 @@ import jieba.analyse
 import markdown  # markdown转html
 import nltk
 import numpy as np
+import tomlkit
 from fuzzywuzzy import process
 from keybert import KeyBERT
 from markdownify import markdownify  # html转markdown
@@ -30,8 +31,10 @@ from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize, word_tokenize
 # from nltk.util import everygrams
 from openai import OpenAI
+from pypinyin import Style, lazy_pinyin
 from rank_bm25 import BM25Okapi
 from sklearn.feature_extraction.text import TfidfVectorizer
+from slugify import slugify
 
 #  ##########################################################################################################################
 # 当前工作目录,配置文件
@@ -324,7 +327,7 @@ class Extensions:
     
     """用分词器提取元关键词"""
     @staticmethod
-    def extract_keywords(content: str, require_words: List[str] ) -> List[str]:
+    def extract_article_keywords(content: str, require_words: List[str] ) -> List[str]:
         if not content: return []
         # 处理成Markdown格式
         try:
@@ -359,7 +362,7 @@ class Extensions:
         if not cn_lang:
             # 英文处理：KeyBERT + 语义优先
             kw_model = KeyBERT()
-            keywords = kw_model.extract_keywords(
+            keywords = kw_model.extract_article_keywords(
                 content.lower(),
                 keyphrase_ngram_range=(1, 6),
                 stop_words=stop_words,
@@ -411,7 +414,7 @@ class Extensions:
 
 
     @staticmethod
-    def extract_excerpt(content: str, length: int = 3) -> str:
+    def extract_article_excerpt(content: str, length: int = 3) -> str:
         # 先将markdown格式转换为纯文本格式
         sentences = sent_tokenize(markdownify(content))
         # 判断文本语言（中文/英文）
@@ -453,11 +456,12 @@ class Extensions:
         gpt = random.choice(gpts)
         role = f"你是一个具有丰富行业知识{'，深谙中国《广告法》' if lang !='英文' else ''}的资深{lang}文案编辑，"
         if mode == "body":
-            prompts = f"""以<{keyword}>为标题，写一篇{lang}爆款科普性文章，以Markdown格式输出,只需输出文章内容，不要输出标题。
+            prompts = f"""以<{keyword}>为标题，写一篇{lang}爆款科普性文章，以Markdown格式输出,只需输出纯文章内容，不再需要输出标题。
 采用文案创作黄金三秒原则。
 要求站在用户角度思考和解读，直击用户痛点，共情用户情绪，并且引导用户咨询和持续关注。
-排版需要考虑阅读体验，合理安排重点信息词语或者段落高亮，每行都需要间隔一个空行（代码除外）。
-在不破坏阅读体验的情况下文章中需要合理安排插入 “[文章插图]”、"[二维码]"。
+排版需要考虑阅读体验，合理安排重点信息词语或者段落高亮，每行都需要间隔一个空行（代码除外）,分割符统一使用20个连续破折号代替。
+正文引用处用上标¹标注，文末按APA格式列尾注（作者，年份，标题，期刊，DOI）。
+在不破坏阅读体验的情况下在合适位置（段落之外，不得破坏段落结构）安排插入 “[文内插图]” 进行占位，以丰富文章内容。
 不要出现与内容无关的解释性语句和文章提示。
 此外，新写的文章需要具备以下特点：
 1. 文章结构清晰，段落过渡自然，避开冷僻词汇，删减文章末尾总结/结论/展望部分，让内容简洁流畅，便于轻松把握思路与意图。
@@ -538,7 +542,7 @@ class Extensions:
                 presence_penalty=0.5    # 鼓励模型引入新内容
             )
             content = completion.choices[0].message.content
-            return re.sub(r'<think>.*</think>', '', content, flags=re.DOTALL)
+            return re.sub(r'<think>.*</think>', '', content.strip(), flags=re.DOTALL)
         except Exception as e:
             logging.error(f"{str(e)}")
             return None
@@ -546,25 +550,8 @@ class Extensions:
 
     """整合成发布的数据结构"""
     @staticmethod
-    def get_article_data(platform) -> List[Dict]:
+    def get_article_data(platform: Dict) -> List[Dict]:
         # 文章内容二次精细化处理
-        @staticmethod
-        def handle_article_content(content: str) -> str:
-            # 匹配所有<h3>、<p>标签，设置样式
-            content = re.sub(r'<p>', '<p style="box-sizing: border-box; border-width: 0px; border-style: solid; border-color: hsl(var(--border)); margin: 1.5em 8px; text-align: left; line-height: 1.75; font-family: -apple-system-font, BlinkMacSystemFont, &quot;Helvetica Neue&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei UI&quot;, &quot;Microsoft YaHei&quot;, Arial, sans-serif; font-size: 14px; letter-spacing: 0.1em; color: rgb(63, 63, 63); visibility: visible;">', content)
-            content = re.sub(r'<h3>', '<hr style="box-sizing: border-box; border-width: 2px 0px 0px; border-style: solid; border-color: rgba(0, 0, 0, 0.1); height: 0.4em; color: inherit; margin: 1.5em 0px; text-align: left; line-height: 1.75; font-family: -apple-system-font, BlinkMacSystemFont, &quot;Helvetica Neue&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei UI&quot;, &quot;Microsoft YaHei&quot;, Arial, sans-serif; font-size: 14px; transform-origin: 0px 0px; transform: scale(1, 0.5); visibility: visible;">\n<h3>', content)
-            # # 找到所有<p>标签的位置，并在中间的</p>后插入内容
-            # p_tags = [m.end() for m in re.finditer(r'</p>', content)]
-            # if p_tags:
-            #     mid_insert_pos = p_tags[len(p_tags) // 2]
-            #     content = content[:mid_insert_pos] + bottom_ad + content[mid_insert_pos:]
-            # 对<h3>标签进行处理：加粗、下划线和居中
-            content = re.compile(r'(</p>\s*)(<p>)', re.DOTALL).sub(
-                lambda m: f'{m.group(1)}<p><br /></p>{m.group(2)}',
-                content
-            )
-            content = re.sub(r'<h3>(.*?)</h3>', r'<h3 style="text-align: center;font-size: 1.17em; font-weight: bold; margin-block: 1em;"><strong><span style="text-align:center;display:inline-blocktext-decoration:underline;">\1</span></strong></h3>', content)
-
         articles = []
         # 获取所有关键词或者标题列表，根据文件名：keywords.txt / titles.txt
         # 当前是关键词模式，还是标题模式
@@ -576,9 +563,10 @@ class Extensions:
                 keys = list(set([s for l in _key if (s := re.sub(r'[\n\ufeff]', '', l)) and len(s) > 1]))
         else:
             return []
-        # while True:
+        # 生成所需文章数据
         for _ in range(platform.get('number', 1)): 
-            key = random.choice(keys)                       # 随机选择一个基础关键词          
+            key = random.choice(keys)                       # 随机选择一个基础关键词 
+            # 文章标题生成         
             _title = ''
             if mode == "titles":                            # 纯标题，不需要生成标题
                 _title = key
@@ -586,7 +574,7 @@ class Extensions:
                 for _t in range(3):
                     _tit = Extensions.get_gpt_generation(keyword=key, lang=platform.get('lang'), mode="title")
                     if _tit and not (_tit.startswith('<p>') or _tit.startswith('<h3>') or ' error' in _tit):
-                        _title = re.sub(r'[\n<>"\'《》{}【】「」——。]|&nbsp;|&lt;|&gt;|boxed', '', _tit)
+                        _title = re.sub(r'[\n<>"\'《》{}【】「」——。]|&nbsp;|&lt;|&gt;|boxed', '', _tit).strip(' \n\r"\'')
                         if not (5<len(re.findall(r'[\u4e00-\u9fff]', _title))<30 or 5<len(re.findall(r"[A-Za-z'-]+", _title))<30):
                             logging.error(f"文章标题 【字数】 不符合要求")
                             continue
@@ -595,6 +583,7 @@ class Extensions:
                         logging.error(f"文章标题 【内容】 不符合要求")
                         continue
             logging.info(f"{_title}, {len(_title)}")
+            
             # 文章内容规则
             for _t in range(3):
                 _content = Extensions.get_gpt_generation(keyword=_title, lang=platform.get('lang'), mode="body")
@@ -607,8 +596,7 @@ class Extensions:
                     logging.error(f"文章详情 【内容】 不符合要求")
                     continue
             
-            # 提取文章SEO关键词
-            # 分词库：必要词
+            # 提取文章标签
             if not platform.get('aitags'):
                 if '.txt' not in platform.get('reqkeys'):
                     reqkeys = list(set(platform.get('reqkeys')))
@@ -617,73 +605,227 @@ class Extensions:
                         reqkeys = list(set([s for l in req_key if (s := re.sub(r'[\n\ufeff]', '', l)) and len(s) > 1]))
                 else:
                     reqkeys = keys if mode == 'keywords' else []
-                _tags = Extensions.extract_keywords(_content, reqkeys)[:5]
+                _tags = Extensions.extract_article_keywords(_content, reqkeys)[:5]
             else:
                 _ts = Extensions.get_gpt_generation(keyword=_content, lang=platform.get('lang'), mode="tags")
                 _tags = [x.strip() for x in re.split(r'[,\u3001]+', _ts) if x.strip()]
+            
+            # 提取文章摘要
             if not platform.get('aiexcerpt'):
-                _excerpt = Extensions.extract_excerpt(content=_content, length=5)
+                _excerpt = Extensions.extract_article_excerpt(content=_content, length=5)
             else:
                 _excerpt = Extensions.get_gpt_generation(keyword=_content, lang=platform.get('lang'), mode="excerpt")
+            _excerpt = _excerpt.strip() if _excerpt else ''
+            
+            # 提取文章图片
+            _img = f"""![{key}](https://image.pollinations.ai/prompt/{key}?width=1200&height=900&enhance=true&private=true&nologo=true&safe=true&model=flux "{key}")"""
+            _content = _content.replace('[文内插图]', _img)
+            _pictures = list(re.compile(r'!\[.*?\]\(\s*([^\s)]+)(?:\s+|\))').findall(_content))
+           
+            # 处理文章内容
+            _content = Extensions.handle_article_content(_title, _content, platform)
 
-            # 去掉机械式开头
-            desc_preg = r'^.*?【?(?:本文|文章|本篇|全文|前言)\s*[，,]?\s*(?:简介|摘要|概述|导读|描述|引言)】?[：:]?'
-            # 检测Markdown的常见语法，如果不是则进行转换
-            if re.search(r'#{1,6} |^-.*$|^```|^\|', _content, re.MULTILINE):
-                _html = markdown.markdown(_content)
-                if '<' in _html and '>' in _html and _html != _content:
-                    _content = markdown.markdown(
-                        re.sub(desc_preg,'', _content, flags=re.DOTALL | re.MULTILINE), 
-                        output_format='html',
-                        extensions=markdown_extensions,
-                        extension_configs=markdown_extconfigs,
-                        safe_mode='escape',
-                        enable_attributes=True,
-                        linkify=True,
-                        tab_length=4,
-                        lazy_ol=False,
-                        toc=True,
-                        toc_depth=4,
-                        toc_title=u'文章目录',
-                        toc_nested=True,
-                        toc_list_type='ul',
-                        toc_list_item_class='toc-list-item',
-                        toc_list_class='toc-list',
-                        toc_header_id='toc',
-                        toc_anchor_title=u'跳转至文章目录',
-                        toc_anchor_title_class='toc-anchor-title'
-                    )
-
-            # 文章再处理（符合平台需要）有BUG
-            # _content  = f"""
-            #     {platform.get('service_ad')}
-            #     {handle_article_content(_content)}
-            #     {platform.get('bottom_ad_top')}
-            #     {platform.get('contact')}
-            #     {platform.get('bottom_ad_bottom')}
-            #     {platform.get("followme")}
-            # """
-
+            # 构建文章数据字典
             article = {
-                "title": _title,                        # 文章标题
-                "keyword": key,                         # 原始关键词
+                "title": _title,
+                "keyword": key,
                 "content": _content,
                 "tags": _tags if _tags else [key],
-                "excerpt": _excerpt
+                "excerpt": _excerpt,
+                "date": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime()),
+                "pictures": _pictures,
+                "cover": _pictures[:1] if _pictures else '',
             }
-            # 判断文章是否为空
-            if not any(v == "" or v is None or (hasattr(v, '__len__') and len(v) == 0) for v in article.values()):
+            # 判断文章是否为空(所有字段)
+            # if not any(v == "" or v is None or (hasattr(v, '__len__') and len(v) == 0) for v in article.values()):
+            # 判断文章是否为空(排除列表)
+            if not any(v == "" or v is None or (not isinstance(v, list) and hasattr(v, "__len__") and len(v) == 0) for v in article.values()):
+                # 添加到articles列表
                 articles.append(article)
-                # 备份文章到本地
-                file_path = Path(WorkDIR) / "article" / f"{uuid.uuid4()}.md"  
-                file_path.parent.mkdir(parents=True, exist_ok=True) 
-                with file_path.open("w", encoding="utf-8") as f:
-                    f.write(article.get('content'))
-                # else:
-                #     logging.error(f"字典中存在空值，跳过该文章")
-                #     continue
+                # 导出到Markdown文件
+                Extensions.export_to_markdown(platform, article)
         return articles
+
     
+    """整合其他信息到文章中"""
+    @staticmethod
+    def handle_article_content(title: str, content: str, platform: Dict) -> str:
+        # 1. 定义 Markdown 特征的正则表达式
+        markdown_patterns = [
+            r'^#{1,6}\s+',                    # 标题（如 #, ##）
+            r'^[-*]\s+',                       # 无序列表（- 或 * 开头）
+            r'^\d+\.\s+',                      # 有序列表（数字. 开头）
+            r'\*\*.*?\*\*|\*.*?\*',            # 粗体 (**text**) 或斜体 (*text*)
+            r'!\[.*?\]\(.*?\)|\[.*?\]\(.*?\)', # 图片或链接
+            r'^```.*?^```',                    # 代码块（多行）
+            r'`.*?`',                          # 行内代码（`text`）
+            r'^>\s+',                          # 引用（> 开头）
+            r'^\|.*?\|',                       # 表格（|...|）
+            r'^[=-]{3,}\s*$',                  # 分割线（--- 或 ===）
+            r'^\s*[*-]{3,}\s*$',               # 单独的分割线（---, ***）
+        ]
+        # 2. 统计有效特征数量
+        count = 0
+        # 3. 预处理：移除代码块和行内代码
+        _text = re.sub(r'(?s)`.*?`', '', re.sub(r'(?s)```.*?```|~~~.*?~~~', '', content))
+        lines = list(map(str.strip, _text.split('\n')))
+        for line in lines:
+            if not line: continue
+            for pattern in markdown_patterns:
+                if re.search(pattern, line, flags=re.MULTILINE | re.DOTALL):
+                    count += 1
+                    break
+        # 4. 判定是否是Markdown内容
+        if count >= 2:
+            # 使用分隔符分割文本，去除标题，只取后半部分纯文章内容
+            # content = re.sub(r'^(={3,}[\r\n]+)', '====================\n', content, flags=re.MULTILINE)
+            # content = re.sub(r'^(-{3,}[\r\n]+)', '--------------------\n', content, flags=re.MULTILINE)
+            # 替换分隔符：统一合并为20个符号
+            content = re.sub(
+                r'^([=-]{3,})[\r\n]+', 
+                lambda m: '='*20 + '\n' if m.group(1).startswith('=') else '-'*20 + '\n',
+                content,
+                flags=re.MULTILINE
+            )
+            # 分隔标题与内容
+            parts1 = content.split(f"====================\n", 1)  # 最多分割一次
+            parts2 = content.split(f"--------------------\n", 1)  # 最多分割一次
+            if len(parts1) > 1 and parts1[0].strip(' \n\r"\'').replace('# ', '', 1) == title:
+                content = parts1[1].strip()
+            elif len(parts2) > 1 and parts2[0].strip(' \n\r"\'').replace('# ', '', 1) == title:
+                content = parts2[1].strip()
+            else:
+                lines = [line for line in content.strip(' \n\r"\'').splitlines() if line.strip()]
+                if lines[0].strip(' \n\r"\'') == title:
+                    content = content.replace(lines[0], '', 1).strip()
+        # 移除所有级别的总结类标题（如：结语、总结、小结、结论）
+        zjbt = r'^(?:#{2,6})\s*(?:结语|总结|小结|结论|总而言之|综上所述|未来展望|展望未来|写在最后)\s*$\n?'
+        wmjz = r'(?:[⁰¹²³⁴⁵⁶⁷⁸⁹]+\.)?\s*(?:标题|题目|文献|参考)?注脚：["“]([^，]+)，(\d{4})，([^，]+)，([^，]+)，(10\.\d{4}\/[^"”]+)["”]' 
+        content = re.sub(fr'({zjbt}|{wmjz})', '', content, flags=re.MULTILINE | re.IGNORECASE)
+        desc = r'^.*?【?(?:本文|文章|本篇|全文|前言)\s*[，,]?\s*(?:简介|摘要|概述|导读|描述|引言)】?[：:]?'
+        content = markdown.markdown(
+            re.sub(desc,'', content, flags=re.DOTALL | re.MULTILINE), # 去掉机械式开头
+            output_format='html',
+            extensions=markdown_extensions,
+            extension_configs=markdown_extconfigs,
+            safe_mode='escape',
+            enable_attributes=True,
+            linkify=True,
+            tab_length=4,
+            lazy_ol=False,
+            toc=True,
+            toc_depth=4,
+            toc_title=u'文章目录',
+            toc_nested=True,
+            toc_list_type='ul',
+            toc_list_item_class='toc-list-item',
+            toc_list_class='toc-list',
+            toc_header_id='toc',
+            toc_anchor_title=u'跳转至文章目录',
+            toc_anchor_title_class='toc-anchor-title'
+        )
+        # 匹配所有<h3>、<p>标签，设置样式
+        content = re.sub(r'<p>', platform.get('phtag'), content)
+        content = re.sub(r'<h3>', platform.get('hrtag'), content)
+        # 文章再处理（符合平台需要）有BUG
+        # content  = f"""
+        #     {platform.get('service_ad')}
+        #     {content}
+        #     {platform.get('bottom_ad_top')}
+        #     {platform.get('contact')}
+        #     {platform.get('bottom_ad_bottom')}
+        #     {platform.get("followme")}
+        # """
+        return content
+
+
+    # 生成CMS文章Dict
+    def export_to_markdown(platform: Dict, data: Dict) -> Optional[bool]:
+        # 生成Front Matter
+        # 将中文部分转换为拼音（保留英文和数字）
+        cn_lang = any(
+            (u'\u4e00' <= char <= u'\u9fa5') or
+            (u'\u3400' <= char <= u'\u4DBF') or
+            (u'\U00020000' <= char <= u'\U0002A6DF')
+            for char in data.get('title', '')
+        )
+        if cn_lang:
+            _title = '-'.join(lazy_pinyin(data.get('title', ''), style=Style.NORMAL, strict=False))
+        else:
+            _title = data.get('title', '')
+        urlname = slugify(
+            _title,
+            separator='-',
+            lowercase=True,
+            regex_pattern=None,
+            word_boundary=True,
+            stopwords=[],
+            replacements=[]
+        )
+        # 创建 TOML 文档对象
+        doc = tomlkit.document()
+        # 基础字段
+        doc["title"] = data.get('title')
+        doc["date"] = data.get('date')
+        doc["tags"] = data['tags'][:5]
+        doc["keywords"] = data['tags'][:5]
+        doc["description"] = data.get('excerpt') or ""
+        doc["categories"] = platform.get('categories')  or []
+        doc["author"] = platform.get('author') or "lopins"
+        doc["cover"] = data.get('cover') or ""
+        doc["pictures"] = data.get('pictures') or []
+        doc["hiddenFromHomePage"] = False
+        doc["readingTime"] = True
+        doc["hideComments"] = True
+        doc["isCJKLanguage"] = True
+        doc["slug"] = urlname
+        # 处理扩展字段添加到文档
+        _extras = {}
+        for k, v in data.get('extras', {}).items():
+            if isinstance(v, str):
+                v = v.strip().strip('(（）)')
+                p = int(v) if v.isdigit() else v
+            else:
+                p = v
+            _extras[k] = p if isinstance(p, int) else f'{json.dumps(p,ensure_ascii=False)[1:-1]}'
+        for key, value in _extras.items():
+            doc[key] = value
+        # 文章状态
+        doc["draft"] = False
+        # 序列化为 TOML 字符串（保留格式）
+        front_matter_block = f"+++\n{tomlkit.dumps(doc).strip()}\n+++"
+
+        if platform.get('cms') == 'hexo':
+            content = front_matter_block.strip()[3:-3].strip()  # 直接去除+++分隔符
+            lines = content.split('\n')
+            _yaml = []
+            for line in lines:
+                line = line.strip()
+                if not line: continue
+                key, val = line.split('=', 1)
+                key = key.strip()
+                val = val.strip()
+                if val.startswith('[') and val.endswith(']'):
+                    # 处理列表项（移除方括号并分割）
+                    items = [i.strip().strip("'\"") for i in val[1:-1].split(',')]
+                    _yaml.append(f"{key}:")
+                    _yaml.extend(f"  - {item}" for item in items if item)
+                elif val in ('true', 'false'):
+                    _yaml.append(f"{key}: {val}")
+                else:
+                    _yaml.append(f"{key}: {val.strip('\"')}")
+            front_matter_block = f"---\n{'\n'.join(_yaml)}\n---"
+        try:
+            doc_name = f"{re.sub(r'\D', '', data.get('date'))}-{uuid.uuid4()}.md"
+            file_path = Path(WorkDIR) / "articles" / doc_name
+            file_path.parent.mkdir(parents=True, exist_ok=True) 
+            with file_path.open("w", encoding="utf-8") as f:
+                f.write(f"{front_matter_block}\n\n{markdownify(data['content'])}")
+            return True if file_path.exists() and file_path.stat().st_size > 0 else False
+        except Exception as e:
+            logging.error(f"保存文件 {file_path} 失败: {str(e)}")
+            return False    
+
 
 if __name__ == "__main__":
     # 获取所有大模型配置

@@ -7,7 +7,7 @@ wheels/
 *.egg-info
 *\.*\.*.csv
 wx*.json
-dev.json
-article/*
+dev.jsons
+article*
 # Virtual environments
 .venv
