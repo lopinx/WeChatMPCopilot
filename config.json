@@ -6,7 +6,7 @@
           "EMPTY"
         ],
         "models": [
-          "deepseek-r1:latest"
+          "qwen3:latest"
         ]
       }
     ],
@@ -28,7 +28,7 @@
         "publish": false,
         "keys": "keywords.txt",
         "reqkeys": [],
-        "number": 3,
+        "number": 1000,
         "source_url": "",
         "author": "lopins",
         "media_ids": {
