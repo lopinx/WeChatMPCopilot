@@ -416,57 +416,20 @@ class Extensions:
         # ===============================================================================================================
 
 
-    @staticmethod
-    def extract_article_excerpt(content: str, length: int = 3) -> str:
-        # 先将markdown格式转换为纯文本格式
-        sentences = sent_tokenize(markdownify(content))
-        # 判断文本语言（中文/英文）
-        cn_lang = any(
-            (u'\u4e00' <= char <= u'\u9fa5') or
-            (u'\u3400' <= char <= u'\u4DBF') or
-            (u'\U00020000' <= char <= u'\U0002A6DF')
-            for char in content
-        )
-        # 分句处理
-        if not cn_lang:
-            sentences = sent_tokenize(content)
-            stop_words = set(stopwords.words('english')).union(en_stopk)
-        else:
-            sentences = [s.strip() for s in re.split(r'[。！？\.\!\?]\s*', content) if s.strip()]
-            stop_words = set(stopwords.words('chinese')).union(cn_stopk)
-        # 分词并去除停用词
-        _sents = []
-        for sent in sentences:
-            if not cn_lang:
-                tokens = [word for word in word_tokenize(sent.lower()) if word not in stop_words]
-            else:
-                tokens = [word for word in jieba.cut(sent) if word not in stop_words]
-            _sents.append(tokens)
-        # 计算 BM25
-        bm25 = BM25Okapi(_sents)
-        # 计算每个句子的得分
-        scores = []
-        for query in _sents:
-            scores.append(bm25.get_scores(query).mean())  # 使用平均得分
-        # 获取得分最高的句子索引并返回摘要
-        excerpt = ' '.join([sentences[i] for i in sorted(np.argsort(scores)[::-1][:length])])
-        return excerpt
-
-
     """通过AI生成标题或内容"""
     @staticmethod
     def get_gpt_generation(keyword: str, lang: str = "",mode: str = "body") -> Optional[str]:
         gpt = random.choice(gpts)
-        role = f"你是一个具有丰富行业知识{'，深谙中国《广告法》' if lang !='英文' else ''}的资深{lang}文案编辑，"
+        role = f"你是一个具有丰富行业知识{'，深谙中国《广告法》' if lang !='英文' else ''}的资深{lang}文案编辑"
         if mode == "body":
-            prompts = f"""以<{keyword}>为标题，，并结合行业特点写一篇{lang}爆款科普性文章，只需直接从正文内容开始以Markdown格式输出，不再需要重复输出标题和其他解释。
+            prompts = f"""请以<{keyword}>为标题，并结合行业特点写一篇{lang}爆款科普性文章
 
 要求：
 - 采用文案创作黄金三秒原则。
 - 要求站在用户角度思考和解读，直击用户痛点，共情用户情绪，并且引导用户咨询和持续关注。
 - 排版需要考虑阅读体验，合理安排重点信息词语或者段落高亮，每行都需要间隔一个空行（代码除外），分割符统一使用20个连续破折号代替。
-- 正文引用处用上标标注，文末按APA格式列尾注（作者，年份，标题，期刊，DOI）。
-- 在不破坏阅读体验的情况下在合适位置（段落之外，不得破坏段落结构）安排插入 “[文内插图]” 进行占位，以丰富文章内容。
+- 正文引用处用上标标注，文末按APA格式列尾注（作者，年份，标题，期刊，DOI），不得虚构尾注内容。
+- 在不破坏阅读体验的情况下在合适位置（段落之外：不得破坏段落结构）安排插入 “[文内插图]” 进行占位，以丰富文章内容。
 - 不要出现与内容无关的解释性语句和文章提示：不要解释“我正在生成文章”之类的引导语；不得出现 "标题：" 或类似提示语。
 
 此外，新写的文章需要具备以下特点：
@@ -478,9 +441,11 @@ class Extensions:
 - 规避《广告法》禁用词：禁用“最”“唯一”等绝对词；效果描述加“可能”“部分用户反馈”等限定词；医疗/食品类禁用“治疗”“治愈”，改用“辅助”“护理”；数据标注来源（如“内部调研显示…”）。
 - 不得引用或者使用虚假网址（如：example.com）和虚假数据（如：品牌、产品、公司、组织、网站、机构、人员、事件、地点、时间、数量、金额、百分比、比例、概率等。
 - 写法指南：杜绝标题党（内容需与标题匹配），避免关键词堆砌（防止机械感），拒绝自嗨（测试三人法则：三人超3秒犹豫则重写）。聚焦标题和关键词，切忌不要偏题、跑题。
+
+请严格按照以上要求，只需以Markdown格式输出正文内容，不再需要再输出标题以及其他解释。
 """
         elif mode == "title":
-            prompts = f"""请以<{keyword}>为关键词，参考下方10种标题写作方法，并结合行业特点写法拟一个{lang}爆款标题。
+            prompts = f"""请以<{keyword}>为关键词，参考下方10种标题写作方法，并结合行业特点写法拟一个{lang}爆款标题
 
 要求：
 - 杜绝使用“：”分割标题，标题末尾不需要句号；
@@ -591,15 +556,17 @@ class Extensions:
                         flags=re.MULTILINE
                     )
                     # 尝试多种方式匹配并移除标题
-                    lines = [line.strip() for line in _content.split('\n') if line.strip()]
                     # 情况1：第一行为标题(或者带#号) -> 移除第一行
-                    if lines and (lines[0] == _title or re.fullmatch(rf'#\s+{re.escape(_title)}', lines[0])):
-                        _content = '\n'.join(lines[1:])  
                     # 情况2：标题被拆分为两行，如 “第一部分\n第二部分” 或者 “第一部分\n——第二部分” -> 移除前两行
+                    # 最后处理剩下的内容：删除以 '——' 开头的首行（如有）
+                    lines = _content.split('\n')
+                    if lines and (lines[0] == _title or re.fullmatch(rf'#\s+{re.escape(_title)}', lines[0])):
+                        lines = '\n'.join(lines[1:]) 
                     elif len(lines) >= 2 and ((lines[0] + lines[1]).strip() == _title or re.match(rf'^—+\s+{re.escape(_title.split()[-1])}$', lines[1])):
-                        _content = '\n'.join(lines[2:]) 
+                        lines = '\n'.join(lines[2:]) 
                     else:
                         pass
+                    if lines and lines[0].startswith('——'): _content = '\n'.join(lines[1:])
                     break
                 else:
                     logging.error(f"文章详情 【内容】 不符合要求")
@@ -620,11 +587,7 @@ class Extensions:
                 _tags = [x.strip() for x in re.split(r'[,\u3001]+', _ts) if x.strip()]
             
             # 提取文章摘要
-            if not platform.get('aiexcerpt'):
-                _excerpt = Extensions.extract_article_excerpt(content=_content, length=5)
-            else:
-                _excerpt = Extensions.get_gpt_generation(keyword=_content, lang=platform.get('lang'), mode="excerpt")
-            _excerpt = _excerpt.strip() if _excerpt else ''
+            _excerpt = Extensions.get_gpt_generation(keyword=_content, lang=platform.get('lang'), mode="excerpt")
             
             # 提取文章图片
             _img = f"""![{key}](https://image.pollinations.ai/prompt/{key}?width=1200&height=900&enhance=true&private=true&nologo=true&safe=true&model=flux "{key}")"""

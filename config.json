@@ -23,7 +23,6 @@
         "cms": "hugo",
         "lang": "中文",
         "aitags": false,
-        "aiexcerpt": false,
         "draft": false,
         "publish": false,
         "keys": "keywords.txt",
