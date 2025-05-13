@@ -32,7 +32,6 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 # from nltk.util import everygrams
 from openai import OpenAI
 from pypinyin import Style, lazy_pinyin
-from rank_bm25 import BM25Okapi
 from sklearn.feature_extraction.text import TfidfVectorizer
 from slugify import slugify
 
